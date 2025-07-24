@@ -96,12 +96,16 @@ def get_race_urls_date(dates, region):
 
 
 def scrape_races(races, folder_name, file_name, file_extension, code, file_writer):
-    out_dir = f'../data/{folder_name}/{code}'
+    # Save to unprocessed folder for batch processing
+    out_dir = '../data/unprocessed'
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    file_path = f'{out_dir}/{file_name}.{file_extension}'
+    # Include folder and code info in filename for better organization
+    safe_folder_name = folder_name.replace('/', '_').replace('\\', '_')
+    enhanced_file_name = f"{safe_folder_name}_{code}_{file_name}"
+    file_path = f'{out_dir}/{enhanced_file_name}.{file_extension}'
 
     with file_writer(file_path) as csv:
         csv.write(settings.csv_header + '\n')
@@ -126,7 +130,7 @@ def scrape_races(races, folder_name, file_name, file_extension, code, file_write
                 csv.write(row + '\n')
 
         print(
-            f'Finished scraping.\n{file_name}.{file_extension} saved in rpscrape/{out_dir.lstrip("../")}'
+            f'Finished scraping.\n{enhanced_file_name}.{file_extension} saved in data/unprocessed/ (ready for batch processing)'
         )
 
 
