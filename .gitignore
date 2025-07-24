@@ -7,3 +7,9 @@ __*/
 .DS_Store
 settings/user_settings.toml
 
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
