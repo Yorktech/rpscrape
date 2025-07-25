@@ -142,7 +142,7 @@ The date format is YYYY/MM/DD, to specify a range of dates, separate them with a
 [rpscrape]> -d 2019/12/18 gb
 ```
 ```
-[rpscrape]> -d 2019/12/15-2019/12/18 ire
+[rpscrape]> -d 2019/12/15-2019/12/18 ire  -d 2025/05/01-2025/05/31 gb 
 ```
 
 ## Command Line Arguments

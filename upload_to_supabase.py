@@ -10,6 +10,9 @@ from supabase import create_client, Client
 from datetime import datetime
 import logging
 import sys
+import os
+import glob
+import shutil
 from typing import Dict, Any, Optional
 
 # Configure logging
@@ -197,8 +200,12 @@ def upload_to_supabase(rows: list, batch_size: int = 100) -> bool:
                 continue
             
             try:
-                # Insert batch into Supabase
-                result = supabase.table('historical_racing_results').insert(transformed_batch).execute()
+                # Insert batch into Supabase with UPSERT to handle duplicates
+                # Use date, course, race_name, horse, pos as unique key
+                result = supabase.table('historical_racing_results').upsert(
+                    transformed_batch,
+                    on_conflict='date,course,race_name,horse,pos'
+                ).execute()
                 
                 if result.data:
                     successful_uploads += len(result.data)
@@ -219,30 +226,92 @@ def upload_to_supabase(rows: list, batch_size: int = 100) -> bool:
         logger.error(f"Error initializing Supabase or during upload: {e}")
         return False
 
+def process_all_csv_files(unprocessed_folder: str, processed_folder: str) -> bool:
+    """Process all CSV files in the unprocessed folder."""
+    logger.info(f"Looking for CSV files in: {unprocessed_folder}")
+    
+    # Find all CSV files in the unprocessed folder
+    csv_pattern = os.path.join(unprocessed_folder, "*.csv")
+    csv_files = glob.glob(csv_pattern)
+    
+    if not csv_files:
+        logger.warning(f"No CSV files found in {unprocessed_folder}")
+        return True
+    
+    logger.info(f"Found {len(csv_files)} CSV files to process")
+    
+    # Ensure processed folder exists
+    os.makedirs(processed_folder, exist_ok=True)
+    
+    total_successful = 0
+    total_failed = 0
+    
+    for csv_file_path in csv_files:
+        filename = os.path.basename(csv_file_path)
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Processing file: {filename}")
+        logger.info(f"{'='*60}")
+        
+        try:
+            # Parse CSV file
+            rows = parse_csv_file(csv_file_path)
+            
+            if not rows:
+                logger.error(f"No rows found in {filename}")
+                total_failed += 1
+                continue
+            
+            logger.info(f"Parsed {len(rows)} rows from {filename}")
+            
+            # Upload to Supabase
+            success = upload_to_supabase(rows)
+            
+            if success:
+                logger.info(f"✅ Upload completed successfully for {filename}")
+                
+                # Move file to processed folder
+                processed_file_path = os.path.join(processed_folder, filename)
+                shutil.move(csv_file_path, processed_file_path)
+                logger.info(f"📁 Moved {filename} to processed folder")
+                
+                total_successful += 1
+            else:
+                logger.error(f"❌ Upload failed for {filename}")
+                total_failed += 1
+                
+        except Exception as e:
+            logger.error(f"❌ Fatal error processing {filename}: {e}")
+            total_failed += 1
+            continue
+    
+    logger.info(f"\n{'='*60}")
+    logger.info(f"BATCH PROCESSING COMPLETE")
+    logger.info(f"{'='*60}")
+    logger.info(f"✅ Successfully processed: {total_successful} files")
+    logger.info(f"❌ Failed to process: {total_failed} files")
+    
+    return total_failed == 0
+
 def main():
     """Main function to orchestrate the CSV upload process."""
-    csv_file_path = r"d:\Source\Repos\rpscrape\data\dates\gb\2025_07_01-2025_07_23.csv"
+    # Define folder paths
+    base_path = r"d:\Source\Repos\rpscrape\data"
+    unprocessed_folder = os.path.join(base_path, "unprocessed")
+    processed_folder = os.path.join(base_path, "processed")
     
-    logger.info("Starting CSV to Supabase upload process...")
+    logger.info("Starting batch CSV to Supabase upload process...")
+    logger.info(f"Unprocessed folder: {unprocessed_folder}")
+    logger.info(f"Processed folder: {processed_folder}")
     
     try:
-        # Parse CSV file
-        rows = parse_csv_file(csv_file_path)
-        
-        if not rows:
-            logger.error("No rows found in CSV file")
-            sys.exit(1)
-        
-        logger.info(f"Parsed {len(rows)} rows from CSV")
-        
-        # Upload to Supabase
-        success = upload_to_supabase(rows)
+        # Process all CSV files in the unprocessed folder
+        success = process_all_csv_files(unprocessed_folder, processed_folder)
         
         if success:
-            logger.info("Upload completed successfully!")
+            logger.info("🎉 All files processed successfully!")
             sys.exit(0)
         else:
-            logger.error("Upload completed with errors")
+            logger.error("⚠️ Some files failed to process")
             sys.exit(1)
             
     except Exception as e:
