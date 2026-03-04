@@ -39,6 +39,10 @@ def check_for_update() -> bool:
     if not update.available():
         return False
 
+    # Skip update in non-interactive environments (e.g., GitHub Actions)
+    if not sys.stdin.isatty():
+        return False
+
     choice = input('Update available. Do you want to update? [y/N] ').strip().lower()
     if choice != 'y':
         return False
