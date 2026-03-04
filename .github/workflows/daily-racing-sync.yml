@@ -51,12 +51,6 @@ jobs:
           python rpscrape.py -d ${{ steps.yesterday.outputs.date }} -r ire
         continue-on-error: true
 
-      - name: Download racecards for today
-        run: |
-          cd scripts
-          python racecards.py -d ${{ steps.today.outputs.date }}
-        continue-on-error: true
-
       - name: Check for changes
         id: check_changes
         run: |
