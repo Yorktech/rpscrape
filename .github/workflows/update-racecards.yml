@@ -30,7 +30,7 @@ jobs:
       - name: Scrape upcoming racecards
         run: |
           cd scripts
-          python racecards.py --day {{ steps.date.outputs.date }}
+          python racecards.py --day ${{ steps.date.outputs.date }}
         continue-on-error: true
 
       - name: Check for changes
