@@ -3,7 +3,7 @@ name: Daily Racing Sync
 on:
   schedule:
     # Run at 07:30 GMT every morning
-    - cron: '30 7 * * *'
+    - cron: '15 7 * * *'
   workflow_dispatch:
 
 jobs:
