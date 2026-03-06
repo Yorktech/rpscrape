@@ -2,14 +2,16 @@ name: Update Racecards Daily
 
 on:
   schedule:
-    # Run at 07:30 GMT every morning
-    - cron: '30 7 * * *'
+    # Run at 07:00 GMT every morning
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 jobs:
   update-racecards:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -49,4 +51,33 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add racecards/
           git commit -m "chore: Update racecards for ${{ steps.date.outputs.date }}"
+          git push
+
+      - name: Checkout target repository
+        if: steps.check_changes.outputs.changes == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: Yorktech/racing-prediction
+          token: ${{ secrets.CROSS_REPO_PAT }}
+          path: target-repo
+
+      - name: Sync racecards to target repository
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          mkdir -p target-repo/racecards
+          rsync -a racecards/ target-repo/racecards/
+
+      - name: Commit and push target repository changes
+        if: steps.check_changes.outputs.changes == 'true'
+        run: |
+          cd target-repo
+          if git diff --quiet; then
+            echo "No changes to push to target repository"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add racecards/
+          git commit -m "chore: sync racecards from rpscrape (${{ steps.date.outputs.date }})"
           git push
