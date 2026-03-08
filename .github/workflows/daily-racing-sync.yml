@@ -2,25 +2,26 @@ name: Daily Racing Sync
 
 on:
   schedule:
-    # Run at 07:00 GMT every morning
-    - cron: '0 7 * * *'
+    # 07:00 UTC daily
+    - cron: "0 7 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   download-results:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -35,67 +36,48 @@ jobs:
 
       - name: Get yesterday's date
         id: yesterday
-        run: echo "date=$(date -d 'yesterday' +'%Y/%m/%d')" >> $GITHUB_OUTPUT
-
-      - name: Get today's date
-        id: today
-        run: echo "date=$(date +'%Y/%m/%d')" >> $GITHUB_OUTPUT
+        run: echo "date=$(date -u -d 'yesterday' +'%Y/%m/%d')" >> "$GITHUB_OUTPUT"
 
       - name: Download results for GB
         run: |
           cd scripts
-          python rpscrape.py -d ${{ steps.yesterday.outputs.date }} -r gb
+          python rpscrape.py -d "${{ steps.yesterday.outputs.date }}" -r gb
         continue-on-error: true
 
       - name: Download results for IRE
         run: |
           cd scripts
-          python rpscrape.py -d ${{ steps.yesterday.outputs.date }} -r ire
+          python rpscrape.py -d "${{ steps.yesterday.outputs.date }}" -r ire
         continue-on-error: true
 
-      - name: Check for changes
-        id: check_changes
+      - name: Prepare results payload
+        shell: bash
         run: |
-          if git diff --quiet; then
-            echo "changes=false" >> $GITHUB_OUTPUT
-          else
-            echo "changes=true" >> $GITHUB_OUTPUT
+          mkdir -p out/results
+          # Collect recent CSV outputs from data/
+          find data -type f -name "*.csv" -mtime -2 -print -exec cp {} out/results/ \;
+          COUNT=$(find out/results -type f -name "*.csv" | wc -l)
+          echo "Found ${COUNT} CSV file(s) for artifact"
+          if [[ "${COUNT}" -eq 0 ]]; then
+            echo "No result CSV files found to upload"
+            exit 1
           fi
 
-      - name: Commit and push changes
-        if: steps.check_changes.outputs.changes == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: Update racing data - results for ${{ steps.yesterday.outputs.date }} and racecards for ${{ steps.today.outputs.date }}"
-          git push
-
-      - name: Checkout target repository
-        if: steps.check_changes.outputs.changes == 'true'
-        uses: actions/checkout@v4
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
         with:
-          repository: Yorktech/racing-prediction
-          token: ${{ secrets.CROSS_REPO_PAT }}
-          path: target-repo
+          name: results-unprocessed
+          path: out/results/*.csv
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Sync data to target repository
-        if: steps.check_changes.outputs.changes == 'true'
+      # Optional: keep this only if you want rpscrape to trigger racing-prediction immediately
+      - name: Trigger racing-prediction pipeline
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
         run: |
-          mkdir -p target-repo/data/unprocessed
-          rsync -a data/ target-repo/data/unprocessed/
-
-      - name: Commit and push target repository changes
-        if: steps.check_changes.outputs.changes == 'true'
-        run: |
-          cd target-repo
-          if git diff --quiet; then
-            echo "No changes to push to target repository"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/unprocessed/
-          git commit -m "chore: sync racing data to unprocessed from rpscrape (${{ steps.yesterday.outputs.date }})"
-          git push
+          gh api repos/Yorktech/racing-prediction/dispatches \
+            -X POST \
+            -f event_type='results_ready' \
+            -f client_payload='{"source":"rpscrape","artifact":"results-unprocessed"}'
