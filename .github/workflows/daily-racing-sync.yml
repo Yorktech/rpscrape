@@ -70,14 +70,3 @@ jobs:
           path: out/results/*.csv
           if-no-files-found: error
           retention-days: 1
-
-      # Optional: keep this only if you want rpscrape to trigger racing-prediction immediately
-      - name: Trigger racing-prediction pipeline
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.CROSS_REPO_PAT }}
-        run: |
-          gh api repos/Yorktech/racing-prediction/dispatches \
-            -X POST \
-            -f event_type='results_ready' \
-            -f client_payload='{"source":"rpscrape","artifact":"results-unprocessed"}'
