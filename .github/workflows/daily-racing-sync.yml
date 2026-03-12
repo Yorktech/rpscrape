@@ -54,19 +54,39 @@ jobs:
         shell: bash
         run: |
           mkdir -p out/results
-          # Collect recent CSV outputs from data/
-          find data -type f -name "*.csv" -mtime -2 -print -exec cp {} out/results/ \;
-          COUNT=$(find out/results -type f -name "*.csv" | wc -l)
-          echo "Found ${COUNT} CSV file(s) for artifact"
+          DATE_UNDERSCORE="$(echo "${{ steps.yesterday.outputs.date }}" | tr '/' '_')"
+
+          GB_SRC="data/region/gb/all/${DATE_UNDERSCORE}.csv"
+          IRE_SRC="data/region/ire/all/${DATE_UNDERSCORE}.csv"
+
+          COUNT=0
+
+          if [[ -f "${GB_SRC}" ]]; then
+            cp "${GB_SRC}" "out/results/GB__${DATE_UNDERSCORE}.csv"
+            echo "Copied GB: ${GB_SRC}"
+            COUNT=$((COUNT+1))
+          else
+            echo "GB file missing: ${GB_SRC}"
+          fi
+
+          if [[ -f "${IRE_SRC}" ]]; then
+            cp "${IRE_SRC}" "out/results/IRE__${DATE_UNDERSCORE}.csv"
+            echo "Copied IRE: ${IRE_SRC}"
+            COUNT=$((COUNT+1))
+          else
+            echo "IRE file missing: ${IRE_SRC}"
+          fi
+
+          echo "Copied ${COUNT} region file(s)"
           if [[ "${COUNT}" -eq 0 ]]; then
-            echo "No result CSV files found to upload"
+            echo "No region CSV files found to upload"
             exit 1
           fi
 
-      - name: Upload results artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: results-unprocessed
-          path: out/results/*.csv
-          if-no-files-found: error
-          retention-days: 1
+          echo "Payload diagnostics:"
+          for f in out/results/*.csv; do
+            [ -f "$f" ] || continue
+            echo "--- $f"
+            wc -l "$f"
+            head -n 2 "$f" || true
+          done
