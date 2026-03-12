@@ -90,3 +90,11 @@ jobs:
             wc -l "$f"
             head -n 2 "$f" || true
           done
+
+      - name: Upload results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-racing-results-${{ replace(steps.yesterday.outputs.date, '/', '_') }}
+          path: out/results/*.csv
+          if-no-files-found: warn
