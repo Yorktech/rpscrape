@@ -95,10 +95,18 @@ jobs:
             head -n 2 "$f" || true
           done
 
-      - name: Upload results artifact
+      - name: Upload GB results artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daily-racing-results-${{ steps.yesterday.outputs.date_underscore }}
-          path: out/results/*.csv
+          name: daily-racing-results-gb-${{ steps.yesterday.outputs.date_underscore }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/results/GB__${{ steps.yesterday.outputs.date_underscore }}.csv
+          if-no-files-found: warn
+
+      - name: Upload IRE results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-racing-results-ire-${{ steps.yesterday.outputs.date_underscore }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/results/IRE__${{ steps.yesterday.outputs.date_underscore }}.csv
           if-no-files-found: warn
