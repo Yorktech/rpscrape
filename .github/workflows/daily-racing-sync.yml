@@ -36,7 +36,11 @@ jobs:
 
       - name: Get yesterday's date
         id: yesterday
-        run: echo "date=$(date -u -d 'yesterday' +'%Y/%m/%d')" >> "$GITHUB_OUTPUT"
+        run: |
+          DATE_SLASH="$(date -u -d 'yesterday' +'%Y/%m/%d')"
+          DATE_UNDERSCORE="$(date -u -d 'yesterday' +'%Y_%m_%d')"
+          echo "date=${DATE_SLASH}" >> "$GITHUB_OUTPUT"
+          echo "date_underscore=${DATE_UNDERSCORE}" >> "$GITHUB_OUTPUT"
 
       - name: Download results for GB
         run: |
@@ -54,7 +58,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p out/results
-          DATE_UNDERSCORE="$(echo "${{ steps.yesterday.outputs.date }}" | tr '/' '_')"
+          DATE_UNDERSCORE="${{ steps.yesterday.outputs.date_underscore }}"
 
           GB_SRC="data/region/gb/all/${DATE_UNDERSCORE}.csv"
           IRE_SRC="data/region/ire/all/${DATE_UNDERSCORE}.csv"
@@ -95,6 +99,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: daily-racing-results-${{ replace(steps.yesterday.outputs.date, '/', '_') }}
+          name: daily-racing-results-${{ steps.yesterday.outputs.date_underscore }}
           path: out/results/*.csv
           if-no-files-found: warn
