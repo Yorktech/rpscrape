@@ -1,4 +1,4 @@
-scripts#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 racecards.py — Racecard scraper for Racing Post (Next.js version)
 ==================================================================
