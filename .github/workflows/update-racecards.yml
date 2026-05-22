@@ -32,7 +32,7 @@ jobs:
       - name: Scrape upcoming racecards
         run: |
           cd scripts
-          python racecards.py --day 1
+          python racecardsv2.py --day 1
         continue-on-error: true
 
       - name: Check for changes
